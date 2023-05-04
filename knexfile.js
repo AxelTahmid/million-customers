@@ -1,4 +1,5 @@
 const { resolve } = require('node:path')
+require('dotenv').config()
 
 module.exports = {
     development: {
