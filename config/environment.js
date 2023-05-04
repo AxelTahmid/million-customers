@@ -46,7 +46,6 @@ module.exports = {
         allowList: function (request, key) {
             return request.headers['x-app-client-id'] === 'dev-team'
         }
-        // make all req except login on admin panel limit free
     },
     mailer: {
         defaults: {
@@ -71,10 +70,3 @@ module.exports = {
         concurrency: parseInt(process.env.QUEUE_CONCURRENCY) || 10
     }
 }
-// for best rate limit
-// redis: {
-// 	host: process.env.REDIS_URL || 'localhost',
-// 	port: process.env.REDIS_PORT || '6379',
-// 	connectTimeout: 500,
-// 	maxRetriesPerRequest: 1
-// },

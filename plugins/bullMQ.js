@@ -3,6 +3,7 @@ const { Queue, Worker } = require('bullmq')
 const IORedis = require('ioredis')
 const jobProcessor = require('../app/mail/index')
 
+// * uses 2-3 redis connection per compute instance
 const fastifyBullMQ = async function (fastify, options, next) {
     try {
         const redis = new IORedis(fastify.conf.redis)
@@ -25,7 +26,6 @@ const fastifyBullMQ = async function (fastify, options, next) {
         if (!fastify.worker) {
             const worker = new Worker(fastify.conf.bullMQ.queue, jobProcessor, {
                 connection: redis,
-                // autorun: false,
                 concurrency: fastify.conf.bullMQ.concurrency,
                 limiter: {
                     max: fastify.conf.bullMQ.max,
@@ -56,9 +56,6 @@ const fastifyBullMQ = async function (fastify, options, next) {
                 )
             })
 
-            // fastify.worker.run()
-
-            // no needed to close queue, global
             fastify.addHook('onClose', (fastify, done) => {
                 if (fastify.worker === worker) {
                     fastify.worker.close()

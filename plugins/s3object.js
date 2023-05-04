@@ -7,7 +7,6 @@ const s3object = async function (fastify, opts, next) {
 			const client = new S3Client(opts)
 			fastify.decorate('s3', client)
 
-			// *maybe not needed, fastify request instance used in config
 			fastify.addHook('onClose', (fastify, done) => {
 				if (fastify.s3) {
 					fastify.s3.destroy(done)

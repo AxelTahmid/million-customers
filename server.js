@@ -63,7 +63,8 @@ if (dev) {
 app.register(require('./app/routes'))
 
 /**
- * * delay is the number of milliseconds for the graceful close to finish
+ * * graceful shutdown 
+ * * delay is the number of milliseconds to finish
  */
 const closeListeners = closeWithGrace(
     { delay: 2000 },

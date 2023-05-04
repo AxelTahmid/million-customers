@@ -1,4 +1,4 @@
-# registry creds secret
+# docker registry token / creds secret
 apiVersion: v1
 kind: Secret
 metadata:
@@ -30,8 +30,20 @@ data:
   DB_PASSWORD: ""
   DB_NAME: ""
   DB_PORT: ""
-  REDIS_ENABLE: ""
-  REDIS_URL: ""
+  S3_ENDPOINT :  "https://<namespace>.compat.objectstorage.<region>.oraclecloud.com"
+  S3_REGION :  "<region>"
+  S3_BUCKET :  "<bucket>"
+  S3_ACCESS_KEY : 
+  S3_SECRET_PASSWORD : 
+  REDIS_URL: "127.0.0.1"
+  REDIS_PORT :  "6379"
+  MAILER_DEFAULT_FROM :  
+  MAILER_USER : 
+  MAILER_PASSWORD : 
+  QUEUE_NAME :  'mail-queue'
+  QUEUE_GLOBAL_CONCURRENCY :  "60"
+  QUEUE_LIMIT_DURATION :  "1000"
+  QUEUE_CONCURRENCY :  "10"
 ---
 # Deployment
 apiVersion: apps/v1
@@ -46,7 +58,7 @@ metadata:
     tier: backend
   namespace: <NAMESPACE>
 spec:
-  replicas: 2
+  replicas: 5
   # Change this to 3 in production deployment.
   revisionHistoryLimit: 0
   selector:
