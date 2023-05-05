@@ -1,10 +1,10 @@
-const { createUser } = require('./customers.services')
+const { parseCustomersToDB, exportTabletoCSV } = require('./customers.services')
 
 /**
- * * Handler POST /v1/user/admin/
+ * * Handler POST /v1/customer/parse
  */
-const create = async function (request, reply) {
-    const data = await createUser(this, request.query.filename)
+const parse = async function (request, reply) {
+    const data = await parseCustomersToDB(this, request.query.filename)
 
     reply.code(201)
 
@@ -14,4 +14,18 @@ const create = async function (request, reply) {
         data
     }
 }
-module.exports = { create }
+/**
+ * * Handler POST /v1/customer/export
+ */
+const exportCSV = async function (request, reply) {
+    const data = await exportTabletoCSV(this, request.query.filename)
+
+    reply.code(201)
+
+    return {
+        error: false,
+        message: 'batch export table to csv completed',
+        data
+    }
+}
+module.exports = { parse, exportCSV }
