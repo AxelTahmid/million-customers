@@ -1,4 +1,5 @@
 const { resolve } = require('node:path')
+const { createReadStream } = require('fs')
 require('dotenv').config()
 
 module.exports = {
@@ -22,8 +23,11 @@ module.exports = {
             password: process.env.DB_PASSWORD || '',
             database: process.env.DB_NAME || 'arektacoinstore',
             port: process.env.DB_PORT || '3306'
+            // infileStreamFactory: path => createReadStream(path)
         },
-        asyncStackTraces: true,
-        debug: true
+        asyncStackTraces: false,
+        debug: false
     }
 }
+
+// https://github.com/sidorares/node-mysql2/issues/1080
