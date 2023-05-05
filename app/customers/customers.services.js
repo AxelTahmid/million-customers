@@ -7,7 +7,8 @@ const { join } = require('node:path')
 // approach 1: utilize ReadStream and piping
 // approach 2: load it in sql, LOAD DATA command
 
-// 89886.445 ms / 1.49 minute - with stream pause feature - no filter
+// 87418.79 ms / 1.45 minute -  no filter for parse and insert
+// 93083.61 ms / 1.55 minute - with filter for parse and insert
 
 /**
  * * parse csv, create users
@@ -19,7 +20,9 @@ const createUser = async (app, fileName) => {
     app.log.info(`filePath here: ${filePath}`)
 
     const batchSize = 25000
-    const batch = []
+    // const batch = []
+    const batchValid = []
+    const batchInvalid = []
 
     const csvStream = createReadStream(filePath).pipe(
         parse({
@@ -37,29 +40,62 @@ const createUser = async (app, fileName) => {
             ]
         })
     )
+    const phoneRegex = /^1?\s?(\(\d{3}\)|\d{3})[-.\s]?\d{3}[-.\s]?\d{4}$/
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    const uniqueRows = new Set()
 
     const action = new Promise((resolve, reject) => {
         csvStream
             .on('data', async function (row) {
-                batch.push(row)
+                if (
+                    phoneRegex.test(row.contact_number) &&
+                    emailRegex.test(row.email)
+                ) {
+                    const uniqueKey = `${row.contact_number}-${row.email}`
+                    if (!uniqueRows.has(uniqueKey)) {
+                        uniqueRows.add(uniqueKey)
+                        batchValid.push(row)
+                    } else {
+                        batchInvalid.push(row)
+                    }
+                } else {
+                    batchInvalid.push(row)
+                }
 
-                if (batch.length >= batchSize) {
+                if (batchValid.length >= batchSize) {
                     csvStream.pause()
                     await app.knex.batchInsert(
-                        'draft_customers',
-                        batch,
+                        'valid_customers',
+                        batchValid,
                         batchSize
                     )
-                    batch.length = 0
+                    batchValid.length = 0
+                    csvStream.resume()
+                }
+
+                if (batchInvalid.length >= batchSize) {
+                    csvStream.pause()
+                    await app.knex.batchInsert(
+                        'invalid_customers',
+                        batchInvalid,
+                        batchSize
+                    )
+                    batchInvalid.length = 0
                     csvStream.resume()
                 }
             })
-
             .on('end', async function () {
-                if (batch.length > 0) {
+                if (batchValid.length > 0) {
                     await app.knex.batchInsert(
-                        'draft_customers',
-                        batch,
+                        'valid_customers',
+                        batchValid,
+                        batchSize
+                    )
+                }
+                if (batchInvalid.length > 0) {
+                    await app.knex.batchInsert(
+                        'invalid_customers',
+                        batchInvalid,
                         batchSize
                     )
                 }

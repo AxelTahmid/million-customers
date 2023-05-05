@@ -1,7 +1,19 @@
 # Fastify Starter Template
 
 This is a fastify starter template with authentication, otp verification, mail queue, sql adapter. 
-<!-- Invalid Record Length: columns length is 8, got 15 on line 1202069 -->
+<!-- Invalid Record Length: columns length is 8, got 15 on line  -->
+<!-- 
+1202069
+1203138
+1202871
+1202603
+1202336
+1203405
+1203672
+87 occurences
+copy pasted set
+ -->
+
 
 Includes features :
 
