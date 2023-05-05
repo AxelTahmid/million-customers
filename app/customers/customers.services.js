@@ -4,11 +4,10 @@ const { parse } = require('csv-parse')
 const { createReadStream } = require('fs')
 const { join } = require('node:path')
 
-// approach 1: load it using node.js streams and process, batchInsert
-// approach 2: load it in sql, LOAD Data
-// approach 3: create seeder files, write stream
+// approach 1: utilize ReadStream and piping
+// approach 2: load it in sql, LOAD DATA command
 
-// 89886.445 ms / 1.49 minute - with stream pause feature
+// 89886.445 ms / 1.49 minute - with stream pause feature - no filter
 
 /**
  * * parse csv, create users
@@ -20,7 +19,7 @@ const createUser = async (app, fileName) => {
     app.log.info(`filePath here: ${filePath}`)
 
     const batchSize = 25000
-    const rows = []
+    const batch = []
 
     const csvStream = createReadStream(filePath).pipe(
         parse({
@@ -38,33 +37,34 @@ const createUser = async (app, fileName) => {
             ]
         })
     )
+
     const action = new Promise((resolve, reject) => {
         csvStream
             .on('data', async function (row) {
-                rows.push(row)
+                batch.push(row)
 
-                if (rows.length >= batchSize) {
+                if (batch.length >= batchSize) {
                     csvStream.pause()
                     await app.knex.batchInsert(
                         'draft_customers',
-                        rows,
+                        batch,
                         batchSize
                     )
-                    rows.length = 0
+                    batch.length = 0
                     csvStream.resume()
                 }
             })
+
             .on('end', async function () {
-                if (rows.length > 0) {
+                if (batch.length > 0) {
                     await app.knex.batchInsert(
                         'draft_customers',
-                        rows,
+                        batch,
                         batchSize
                     )
                 }
 
                 const end = Date.now()
-                // app.log.info(`Execution time: ${end - start} ms`)
                 resolve(`Execution time: ${end - start} ms`)
             })
             .on('error', function (error) {

@@ -1,6 +1,6 @@
 const fp = require('fastify-plugin')
 const knex = require('knex')
-const paginator = require('../utility/knex')
+const paginator = require('../utility/paginator')
 
 const fastifyKnex = async function (fastify, options, next) {
 	try {
