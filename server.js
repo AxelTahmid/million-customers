@@ -31,31 +31,15 @@ const app = Fastify({
 // * configuration decorator and defaults
 app.decorate('conf', require('./config/environment'))
     .register(require('@fastify/helmet'), { global: true })
-    .register(require('@fastify/cors'), app.conf.cors)
-    .register(require('@fastify/formbody'))
-    .register(require('./plugins/jwt'))
     .register(require('@fastify/sensible'))
-    .register(require('@fastify/redis'), app.conf.redis)
+    .register(require('@fastify/cors'), app.conf.cors)
+// .register(require('@fastify/multipart'), app.conf.multer)
 
-// * rate-limit redis
-const IORedis = require('ioredis')
-app.conf.rate_limit.redis = new IORedis(app.conf.redis)
-app.register(require('@fastify/rate-limit'), app.conf.rate_limit)
-
-// * bullMQ
-app.register(require('./plugins/bullMQ'))
 /**
  * * MySQL Database
  */
 const knex = require('./plugins/knex')
-if (dev) {
-    app.log.info('db: development')
-    const { development } = require('./knexfile')
-    app.register(knex, development)
-} else {
-    app.log.info('db: production')
-    app.register(knex, app.conf.sql)
-}
+app.register(knex, app.conf.sql)
 
 /**
  * * Register the app directory

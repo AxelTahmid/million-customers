@@ -23,7 +23,7 @@ echo -e "*          Migrating Tables          *"
 echo -e "*********************************${NC}"
 npx knex migrate:latest --debug
 
-# echo -e "${GREEN}*********************************"
-# echo -e "*          Seeding Tables          *"
-# echo -e "*********************************${NC}"
-# npx knex seed:run --debug
+echo -e "${GREEN}*********************************"
+echo -e "*          Seeding Tables          *"
+echo -e "*********************************${NC}"
+npx knex seed:run --debug

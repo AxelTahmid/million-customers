@@ -1,9 +1,6 @@
 module.exports = {
     cors: {
-        origin: [
-            'http://localhost:3001',
-            'http://localhost:3000'
-        ],
+        origin: ['http://localhost:3001', 'http://localhost:3000'],
         method: ['GET', 'PUT', 'PATCH', 'POST', 'DELETE'],
         allowedHeaders: [
             'Content-Type',
@@ -16,7 +13,9 @@ module.exports = {
     },
     sql: {
         client: 'mysql2',
-        acquireConnectionTimeout: 10000,
+        pool: {
+            propagateCreateError: false
+        },
         connection: {
             host: process.env.DB_HOST,
             user: process.env.DB_USER,
@@ -27,46 +26,13 @@ module.exports = {
         asyncStackTraces: false,
         debug: false
     },
-    redis: {
-        host: process.env.REDIS_URL || 'localhost',
-        port: process.env.REDIS_PORT || '6379',
-        maxRetriesPerRequest: null
-    },
-    rate_limit: {
-        max: 15,
-        timeWindow: 1000 * 60,
-        nameSpace: 'uniq:limit:',
-        keyGenerator: request => {
-            const unique =
-                request.headers['x-real-ip'] ||
-                request.headers['x-forwarded-for'] ||
-                request.raw.ip
-            return `${unique}:${request.routerPath}`
-        },
-        allowList: function (request, key) {
-            return request.headers['x-app-client-id'] === 'dev-team'
+    multer: {
+        limits: {
+            fieldNameSize: 100, // Max field name size in bytes
+            fieldSize: 100, // Max field value size in bytes
+            fields: 2, // Max number of non-file fields
+            fileSize: 1000000, // the max file size in bytes, 1MB
+            files: 1 // Max number of file fields
         }
-    },
-    mailer: {
-        defaults: {
-            from:
-                process.env.MAILER_DEFAULT_FROM ||
-                'ArektaCoinStore <info.arektacoinstore@gmail.com>',
-            subject: 'No-Reply ArektaCoinStore'
-        },
-        transport: {
-            service: 'gmail',
-            auth: {
-                user:
-                    process.env.MAILER_USER || 'info.arektacoinstore@gmail.com',
-                pass: process.env.MAILER_PASSWORD || 'xjqscmchhemexapc'
-            }
-        }
-    },
-    bullMQ: {
-        queue: process.env.QUEUE_NAME || 'mail-queue',
-        max: parseInt(process.env.QUEUE_GLOBAL_CONCURRENCY) || 60,
-        duration: parseInt(process.env.QUEUE_LIMIT_DURATION) || 1000,
-        concurrency: parseInt(process.env.QUEUE_CONCURRENCY) || 10
     }
 }

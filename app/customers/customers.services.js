@@ -1,109 +1,75 @@
-/* eslint-disable prefer-regex-literals */
-/* eslint-disable quotes, no-console */
+/* eslint-disable no-useless-escape, max-len,quotes, no-console  */
+
 const { parse } = require('csv-parse')
 const { createReadStream } = require('fs')
 const { join } = require('node:path')
 
-console.log('hello')
-
-// approach 1: load it using node.js streams and process
+// approach 1: load it using node.js streams and process, batchInsert
 // approach 2: load it in sql, LOAD Data
 // approach 3: create seeder files, write stream
 
 /**
  * * parse csv, create users
  */
-const createUser = async (app, props) => {
-    const start = Date.now()
-    const fileName = '1K-test.txt'
-    // const fileName = '1M-customers.txt'
+const createUser = async (app, fileName) => {
     const filePath = join(__dirname, '..', '..', 'data', fileName)
 
-    app.log.info({ filePath }, 'filePath here: ')
+    app.log.info(`filePath here: ${filePath}`)
 
-    // const action = await app.knex.raw(
-    //     "LOAD DATA INFILE ? INTO TABLE ? FIELDS TERMINATED BY ',' LINES TERMINATED BY '\n'",
-    //     [filePath, 'customers']
-    // )
-    // await app.knex.raw('SET GLOBAL local_infile = true;')
-    // const action = await app.knex.raw({
-    //     sql: `LOAD DATA LOCAL INFILE '${filePath}'
-    //         INTO TABLE customers
-    //         FIELDS TERMINATED BY ','
-    //         LINES TERMINATED BY '\n'
-    //         ( @first_name,
-    //         @last_name,
-    //         @city,
-    //         @state,
-    //         @postal_code,
-    //         @contact_number,
-    //         @email,
-    //         @ip_address
-    //         )
-    //         SET
-    //         first_name= @first_name,
-    //         last_name = @last_name,
-    //         city = @city,
-    //         state = @state,
-    //         postal_code = @postal_code,
-    //         contact_number = @contact_number,
-    //         email = @email,
-    //         ip_address = @ip_address`,
-    //     infileStreamFactory: path => createReadStream(path)
-    // })
+    const start = Date.now()
 
-    const mailValidator = new RegExp('[a-z0-9]+@[a-z]+.[a-z]{2,3}')
-    const phoneValidator =
-        /^(\+\d{1,2}\s?)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}$/gm
-
-    const action = trx => {
-        return new Promise((resolve, reject) => {
-            createReadStream(filePath)
-                .pipe(
-                    parse({
-                        delimiter: ',',
-                        from_line: 1,
-                        columns: [
-                            'first_name',
-                            'last_name',
-                            'city',
-                            'state',
-                            'postal_code',
-                            'contact_number',
-                            'email',
-                            'ip_address'
-                        ]
-                    })
-                )
-                .on('data', async function (row) {
-                    // app.log.info({ row }, 'row here: ')
-                    if (
-                        mailValidator.test(row.email) &&
-                        phoneValidator.test(row.contact_number)
-                    ) {
-                        await app
-                            .knex('customers')
-                            .insert(row)
-                            .onConflict('email')
-                            .ignore()
-                    } else {
-                        await app.knex('invalid_customers').insert(row)
-                    }
+    const batchSize = 10000
+    const rows = []
+    const action = new Promise((resolve, reject) => {
+        createReadStream(filePath)
+            .pipe(
+                parse({
+                    delimiter: ',',
+                    from_line: 1,
+                    columns: [
+                        'first_name',
+                        'last_name',
+                        'city',
+                        'state',
+                        'postal_code',
+                        'contact_number',
+                        'email',
+                        'ip_address'
+                    ]
                 })
-                .on('end', function () {
-                    app.log.info('Process Completed.')
-                    return null
-                })
-                .on('error', function (error) {
-                    app.log.error({ error }, `${error.message}`)
-                })
-        })
-    }
+            )
+            .on('data', async function (row) {
+                rows.push(row)
 
-    await action()
+                if (rows.length >= batchSize) {
+                    await app.knex.batchInsert(
+                        'draft_customers',
+                        rows,
+                        batchSize
+                    )
+                    rows.length = 0
+                }
+            })
+            .on('end', async function () {
+                if (rows.length > 0) {
+                    await app.knex.batchInsert(
+                        'draft_customers',
+                        rows,
+                        batchSize
+                    )
+                }
 
-    const end = Date.now()
-    return `Execution time: ${end - start} ms`
+                app.log.info('Process Completed.')
+                const end = Date.now()
+                resolve(`Execution time: ${end - start} ms`)
+            })
+            .on('error', function (error) {
+                app.log.error({ error }, `${error.message}`)
+                reject(error)
+            })
+    })
+
+    return await action
 }
 
 module.exports = { createUser }
