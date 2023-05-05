@@ -17,15 +17,19 @@ const { join } = require('node:path')
  * * parse csv, insert into DB
  * ! 87418.79 ms / 1.45 minute -  no filter for parse and insert
  * ! 93083.61 ms / 1.55 minute - with filter for parse and insert
+ * ! 9461 ms or 94.61 seconds with export csv
  */
 const parseCustomersToDB = async (app, fileName) => {
     const start = Date.now()
     const filePath = join(__dirname, '..', '..', 'data', fileName)
+    const outputPath = join(__dirname, '..', '..', 'data', 'output', './')
+    app.log.info({ filePath, outputPath }, 'data here: ')
 
-    app.log.info(`filePath here: ${filePath}`)
+    // const batchExportSize = 100000
+    // let validRowCount = 0
+    // let validFileCount = 1
 
     const batchSize = 25000
-    // const batch = []
     const batchValid = []
     const batchInvalid = []
 
@@ -45,6 +49,14 @@ const parseCustomersToDB = async (app, fileName) => {
             ]
         })
     )
+
+    // let validFileStream = createWriteStream(
+    //     `${outputPath}valid_customers_${validFileCount}.csv`
+    // )
+    // const invalidFileStream = createWriteStream(
+    //     `${outputPath}invalid_customers.csv`
+    // )
+
     const phoneRegex = /^1?\s?(\(\d{3}\)|\d{3})[-.\s]?\d{3}[-.\s]?\d{4}$/
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     const uniqueRows = new Set()
@@ -60,11 +72,30 @@ const parseCustomersToDB = async (app, fileName) => {
                     if (!uniqueRows.has(uniqueKey)) {
                         uniqueRows.add(uniqueKey)
                         batchValid.push(row)
+
+                        // validRowCount++
+                        // validFileStream.write(
+                        //     `${row.id},${row.first_name},${row.last_name},${row.city},${row.state},${row.postal_code},${row.contact_number},${row.email},${row.ip_address}\n`
+                        // )
+                        // if (validRowCount >= batchExportSize) {
+                        //     validFileStream.end()
+                        //     validFileCount++
+                        //     validRowCount = 0
+                        //     validFileStream = createWriteStream(
+                        //         `${outputPath}valid_customers_${validFileCount}.csv`
+                        //     )
+                        // }
                     } else {
                         batchInvalid.push(row)
+                        // invalidFileStream.write(
+                        //     `${row.id},${row.first_name},${row.last_name},${row.city},${row.state},${row.postal_code},${row.contact_number},${row.email},${row.ip_address}\n`
+                        // )
                     }
                 } else {
                     batchInvalid.push(row)
+                    // invalidFileStream.write(
+                    //     `${row.id},${row.first_name},${row.last_name},${row.city},${row.state},${row.postal_code},${row.contact_number},${row.email},${row.ip_address}\n`
+                    // )
                 }
 
                 if (batchValid.length >= batchSize) {
@@ -127,9 +158,14 @@ const exportTabletoCSV = async (app, fileName) => {
     const outputPath = join(__dirname, '..', '..', 'data', 'output', './')
     app.log.info({ outputPath }, 'data here: ')
 
-    const batchSize = 10000
+    const batchExportSize = 100000
     let validRowCount = 0
     let validFileCount = 1
+
+    const csvStream = createReadStream(filePath)
+    const phoneRegex = /^1?\s?(\(\d{3}\)|\d{3})[-.\s]?\d{3}[-.\s]?\d{4}$/
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    const uniqueRows = new Set()
 
     let validFileStream = createWriteStream(
         `${outputPath}valid_customers_${validFileCount}.csv`
@@ -137,11 +173,6 @@ const exportTabletoCSV = async (app, fileName) => {
     const invalidFileStream = createWriteStream(
         `${outputPath}invalid_customers.csv`
     )
-
-    const csvStream = createReadStream(filePath)
-    const phoneRegex = /^1?\s?(\(\d{3}\)|\d{3})[-.\s]?\d{3}[-.\s]?\d{4}$/
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    const uniqueRows = new Set()
 
     const action = new Promise((resolve, reject) => {
         pipeline(csvStream, parse({ delimiter: ',' }), err => {
@@ -159,7 +190,7 @@ const exportTabletoCSV = async (app, fileName) => {
                     uniqueRows.add(uniqueKey)
                     validRowCount++
                     validFileStream.write(row.join(',') + '\n', 'utf-8')
-                    if (validRowCount >= batchSize) {
+                    if (validRowCount >= batchExportSize) {
                         validFileStream.end()
                         validFileCount++
                         validRowCount = 0
