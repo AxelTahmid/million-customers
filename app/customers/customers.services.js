@@ -25,6 +25,7 @@ const parseCustomersToDB = async (app, fileName) => {
     app.log.info({ filePath, outputPath }, 'data here: ')
 
     // vars for sequential file export
+    // change if you want less lines per file
     const batchExportSize = 100000
     let validRowCount = 0
     let validFileCount = 1

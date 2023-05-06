@@ -74,5 +74,7 @@ i.e : `localhost:3000/v1/customer/parse?filename=<filename>`
 
 request returns execution time in `ms - miliseconds`.
 
+This will trigger the process. given csv will be parsed, processed, inserted to sql and simultaneously filtered data written to `data/output` 
+
 ## Note
-if you get errors related to columns breaking, use a proper `csv` file. Or use `VSCode` and regex to filter it.
+if you get errors related to columns breaking, use a proper `csv` file. Or use `VSCode` and regex to filter it. the `csv` values are in `data/output` folder
