@@ -10,7 +10,7 @@ const parse = async function (request, reply) {
 
     return {
         error: false,
-        message: 'csv parsed and inserted',
+        message: 'csv parsed, filtered, inserted and created',
         data
     }
 }

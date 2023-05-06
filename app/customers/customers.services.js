@@ -7,14 +7,15 @@ const { parse } = require('csv-parse')
 const { createReadStream, createWriteStream } = require('fs')
 const { join } = require('node:path')
 
+// covers phone cases given in instruction set, valid US number
 const phoneRegex = /^1?\s?(\(\d{3}\)|\d{3})[-.\s]?\d{3}[-.\s]?\d{4}$/
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 /**
  * * parse csv, insert into DB
- * ! 87418.79 ms / 87 seconds -  no filter for parse and insert
- * ! 93083.61 ms / 93 seconds - with filter for parse and insert
- * ! 9461 ms / 94 seconds with export csv
+ * ! 87 seconds - no filter
+ * ! 93 seconds - with filter
+ * ! 94 seconds - with filter and export csv
  */
 const parseCustomersToDB = async (app, fileName) => {
     const start = Date.now()
