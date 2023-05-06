@@ -34,11 +34,19 @@ Requirements:
 - `NPM >= 9`
 
 create `.env` from `.env.example` file and replace with proper database values.
-Host should be `0.0.0.0` if you are using Docker. 
+Host should be `0.0.0.0` if you are using Docker. Then install the app.
 
 ```
 npm install
 ```
+
+once you have proper values for DB in env, run 
+
+```
+npm run db:migrate
+```
+
+this will process migration and create the necessary tables. incase of testing docker, need to already have migrations in your db as we are using a distroless image.
 
 ### Docker :
 
