@@ -25,14 +25,5 @@ module.exports = {
         },
         asyncStackTraces: false,
         debug: false
-    },
-    multer: {
-        limits: {
-            fieldNameSize: 100, // Max field name size in bytes
-            fieldSize: 100, // Max field value size in bytes
-            fields: 2, // Max number of non-file fields
-            fileSize: 1000000, // the max file size in bytes, 1MB
-            files: 1 // Max number of file fields
-        }
     }
 }

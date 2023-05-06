@@ -33,7 +33,6 @@ app.decorate('conf', require('./config/environment'))
     .register(require('@fastify/helmet'), { global: true })
     .register(require('@fastify/sensible'))
     .register(require('@fastify/cors'), app.conf.cors)
-// .register(require('@fastify/multipart'), app.conf.multer)
 
 /**
  * * MySQL Database

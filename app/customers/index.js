@@ -6,10 +6,4 @@ module.exports = async function (fastify) {
         url: '/parse',
         handler: parse
     })
-
-    fastify.route({
-        method: 'POST',
-        url: '/export',
-        handler: exportCSV
-    })
 }

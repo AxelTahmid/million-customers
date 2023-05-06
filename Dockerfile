@@ -6,6 +6,7 @@ RUN npm install --omit=dev
 
 # --------> The production image, USER node in alpine
 # distroless image for maximum security. has no shell
+# you can check log though
 FROM gcr.io/distroless/nodejs:18
 USER 1000
 WORKDIR /usr/src/app

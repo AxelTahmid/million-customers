@@ -2,37 +2,38 @@
  * * approach 1: utilize ReadStream and piping, chunk it all, store it.
  * * approach 2: load it in sql, LOAD DATA command in draft, postprocess it
  * - went with approach 1 for security concerns
- * - could have used the same parse stream to write csv files
- * - but it makes the whole code unreadable and sphagetti.
- * - instruction clear on sequential steps so keeping it seprate
- * - negligible loss in performance but
- * - major reduce in technical debt
  */
 const { parse } = require('csv-parse')
 const { createReadStream, createWriteStream } = require('fs')
-const { pipeline } = require('stream')
 const { join } = require('node:path')
+
+const phoneRegex = /^1?\s?(\(\d{3}\)|\d{3})[-.\s]?\d{3}[-.\s]?\d{4}$/
+const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 /**
  * * parse csv, insert into DB
- * ! 87418.79 ms / 1.45 minute -  no filter for parse and insert
- * ! 93083.61 ms / 1.55 minute - with filter for parse and insert
- * ! 9461 ms or 94.61 seconds with export csv
+ * ! 87418.79 ms / 87 seconds -  no filter for parse and insert
+ * ! 93083.61 ms / 93 seconds - with filter for parse and insert
+ * ! 9461 ms / 94 seconds with export csv
  */
 const parseCustomersToDB = async (app, fileName) => {
     const start = Date.now()
+    // normalizing path flow as unix and windows have different
     const filePath = join(__dirname, '..', '..', 'data', fileName)
     const outputPath = join(__dirname, '..', '..', 'data', 'output', './')
     app.log.info({ filePath, outputPath }, 'data here: ')
 
-    // const batchExportSize = 100000
-    // let validRowCount = 0
-    // let validFileCount = 1
+    // vars for sequential file export
+    const batchExportSize = 100000
+    let validRowCount = 0
+    let validFileCount = 1
 
+    // vars for sql insertion
     const batchSize = 25000
     const batchValid = []
     const batchInvalid = []
 
+    // primary parser, creating stream, formatting data,
     const csvStream = createReadStream(filePath).pipe(
         parse({
             delimiter: ',',
@@ -50,20 +51,26 @@ const parseCustomersToDB = async (app, fileName) => {
         })
     )
 
-    // let validFileStream = createWriteStream(
-    //     `${outputPath}valid_customers_${validFileCount}.csv`
-    // )
-    // const invalidFileStream = createWriteStream(
-    //     `${outputPath}invalid_customers.csv`
-    // )
-
-    const phoneRegex = /^1?\s?(\(\d{3}\)|\d{3})[-.\s]?\d{3}[-.\s]?\d{4}$/
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    // WriteStreams for valid-invalid data
+    let validFileStream = createWriteStream(
+        `${outputPath}valid_customers_${validFileCount}.csv`
+    )
+    const invalidFileStream = createWriteStream(
+        `${outputPath}invalid_customers.csv`
+    )
+    // to identify duplicate entries
     const uniqueRows = new Set()
 
+    // promisifying stream so that we can wait for it as it completes
     const action = new Promise((resolve, reject) => {
         csvStream
+            .on('error', function (error) {
+                app.log.error({ error }, `${error.message}`)
+                reject(error)
+            })
             .on('data', async function (row) {
+                // check phone and email. then check duplicate entry
+                // mentioned in instruction to use phone and email both
                 if (
                     phoneRegex.test(row.contact_number) &&
                     emailRegex.test(row.email)
@@ -71,33 +78,42 @@ const parseCustomersToDB = async (app, fileName) => {
                     const uniqueKey = `${row.contact_number}-${row.email}`
                     if (!uniqueRows.has(uniqueKey)) {
                         uniqueRows.add(uniqueKey)
+                        // for batch insert
                         batchValid.push(row)
 
-                        // validRowCount++
-                        // validFileStream.write(
-                        //     `${row.id},${row.first_name},${row.last_name},${row.city},${row.state},${row.postal_code},${row.contact_number},${row.email},${row.ip_address}\n`
-                        // )
-                        // if (validRowCount >= batchExportSize) {
-                        //     validFileStream.end()
-                        //     validFileCount++
-                        //     validRowCount = 0
-                        //     validFileStream = createWriteStream(
-                        //         `${outputPath}valid_customers_${validFileCount}.csv`
-                        //     )
-                        // }
+                        // file writing - checking row count, stopping and creating new when 100k+
+                        // only for valid, as all invalid data is in 1 file
+                        validRowCount++
+                        validFileStream.write(
+                            `${row.id},${row.first_name},${row.last_name},${row.city},${row.state},${row.postal_code},${row.contact_number},${row.email},${row.ip_address}\n`
+                        )
+                        if (validRowCount >= batchExportSize) {
+                            validFileStream.end()
+                            validFileCount++
+                            validRowCount = 0
+                            validFileStream = createWriteStream(
+                                `${outputPath}valid_customers_${validFileCount}.csv`
+                            )
+                        }
                     } else {
+                        // for batch insert
                         batchInvalid.push(row)
-                        // invalidFileStream.write(
-                        //     `${row.id},${row.first_name},${row.last_name},${row.city},${row.state},${row.postal_code},${row.contact_number},${row.email},${row.ip_address}\n`
-                        // )
+                        // file writing
+                        invalidFileStream.write(
+                            `${row.id},${row.first_name},${row.last_name},${row.city},${row.state},${row.postal_code},${row.contact_number},${row.email},${row.ip_address}\n`
+                        )
                     }
                 } else {
+                    // for batch insert
                     batchInvalid.push(row)
-                    // invalidFileStream.write(
-                    //     `${row.id},${row.first_name},${row.last_name},${row.city},${row.state},${row.postal_code},${row.contact_number},${row.email},${row.ip_address}\n`
-                    // )
+                    // file writing
+                    invalidFileStream.write(
+                        `${row.id},${row.first_name},${row.last_name},${row.city},${row.state},${row.postal_code},${row.contact_number},${row.email},${row.ip_address}\n`
+                    )
                 }
 
+                // pausing stream while doing batchInsert transaction
+                // otherwise memory will leak and cause crash
                 if (batchValid.length >= batchSize) {
                     csvStream.pause()
                     await app.knex.batchInsert(
@@ -108,7 +124,6 @@ const parseCustomersToDB = async (app, fileName) => {
                     batchValid.length = 0
                     csvStream.resume()
                 }
-
                 if (batchInvalid.length >= batchSize) {
                     csvStream.pause()
                     await app.knex.batchInsert(
@@ -121,6 +136,7 @@ const parseCustomersToDB = async (app, fileName) => {
                 }
             })
             .on('end', async function () {
+                // inserting remaining rows
                 if (batchValid.length > 0) {
                     await app.knex.batchInsert(
                         'valid_customers',
@@ -136,78 +152,15 @@ const parseCustomersToDB = async (app, fileName) => {
                     )
                 }
 
+                // closing FileStream to prevent memory leaks
+                validFileStream.end()
+                invalidFileStream.end()
                 const end = Date.now()
                 resolve(`Execution time: ${end - start} ms`)
-            })
-            .on('error', function (error) {
-                app.log.error({ error }, `${error.message}`)
-                reject(error)
             })
     })
 
     return await action
 }
 
-/**
- * * parse table, batch export to csv
- * ! 7597 ms / 7.5 seconds
- */
-const exportTabletoCSV = async (app, fileName) => {
-    const start = Date.now()
-    const filePath = join(__dirname, '..', '..', 'data', fileName)
-    const outputPath = join(__dirname, '..', '..', 'data', 'output', './')
-    app.log.info({ outputPath }, 'data here: ')
-
-    const batchExportSize = 100000
-    let validRowCount = 0
-    let validFileCount = 1
-
-    const csvStream = createReadStream(filePath)
-    const phoneRegex = /^1?\s?(\(\d{3}\)|\d{3})[-.\s]?\d{3}[-.\s]?\d{4}$/
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    const uniqueRows = new Set()
-
-    let validFileStream = createWriteStream(
-        `${outputPath}valid_customers_${validFileCount}.csv`
-    )
-    const invalidFileStream = createWriteStream(
-        `${outputPath}invalid_customers.csv`
-    )
-
-    const action = new Promise((resolve, reject) => {
-        pipeline(csvStream, parse({ delimiter: ',' }), err => {
-            if (err) {
-                app.log.error({ error: err }, `${err.message}`)
-                reject(err)
-            } else {
-                const end = Date.now()
-                resolve(`Execution time: ${end - start} ms`)
-            }
-        }).on('data', row => {
-            if (phoneRegex.test(row[5]) && emailRegex.test(row[6])) {
-                const uniqueKey = `${row[5]}-${row[6]}`
-                if (!uniqueRows.has(uniqueKey)) {
-                    uniqueRows.add(uniqueKey)
-                    validRowCount++
-                    validFileStream.write(row.join(',') + '\n', 'utf-8')
-                    if (validRowCount >= batchExportSize) {
-                        validFileStream.end()
-                        validFileCount++
-                        validRowCount = 0
-                        validFileStream = createWriteStream(
-                            `${outputPath}valid_customers_${validFileCount}.csv`
-                        )
-                    }
-                }
-            } else {
-                invalidFileStream.write(row.join(',') + '\n', 'utf-8')
-            }
-        })
-    })
-
-    const end = Date.now()
-    app.log.info(`Execution time: ${end - start} ms`)
-    return await action
-}
-
-module.exports = { parseCustomersToDB, exportTabletoCSV }
+module.exports = { parseCustomersToDB }
